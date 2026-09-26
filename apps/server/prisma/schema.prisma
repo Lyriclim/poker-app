@@ -1,0 +1,71 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String        @id @default(uuid())
+  username     String        @unique
+  passwordHash String
+  avatar       String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  seats        Seat[]
+}
+
+model Room {
+  id         String   @id @default(uuid())
+  name       String
+  inviteCode String   @unique
+  smallBlind Int      @default(5)
+  bigBlind   Int      @default(10)
+  maxPlayers Int      @default(9)
+  status     String   @default("WAITING")
+  createdBy  String
+  createdAt  DateTime @default(now())
+  seats      Seat[]
+  hands      Hand[]
+}
+
+model Seat {
+  id        String   @id @default(uuid())
+  roomId    String
+  userId    String
+  seatIndex Int
+  stack     Int      @default(0)
+  status    String   @default("SEATED")
+  joinedAt  DateTime @default(now())
+  room      Room     @relation(fields: [roomId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@unique([roomId, userId])
+  @@unique([roomId, seatIndex])
+}
+
+model Hand {
+  id         String        @id @default(uuid())
+  roomId     String
+  handNumber Int
+  board      String        @default("[]")
+  pot        Int           @default(0)
+  winners    String        @default("[]")
+  createdAt  DateTime      @default(now())
+  room       Room          @relation(fields: [roomId], references: [id])
+  actions    HandAction[]
+}
+
+model HandAction {
+  id        String   @id @default(uuid())
+  handId    String
+  playerId  String
+  seatIndex Int
+  action    String
+  amount    Int
+  street    String
+  createdAt DateTime @default(now())
+  hand      Hand     @relation(fields: [handId], references: [id])
+}

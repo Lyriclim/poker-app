@@ -1,0 +1,25 @@
+{
+  "name": "poker-app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "concurrently -n server,web -c blue,green \"npm:dev:server\" \"npm:dev:web\"",
+    "dev:server": "npm run dev -w @poker/server",
+    "dev:web": "npm run dev -w @poker/web",
+    "build": "npm run build -w @poker/web",
+    "test": "npm run test -w @poker/server",
+    "typecheck": "npm run typecheck -w @poker/server && npm run typecheck -w @poker/web",
+    "db:push": "npm run db:push -w @poker/server"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}

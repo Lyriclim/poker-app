@@ -1,0 +1,169 @@
+@import "tailwindcss";
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: #0a0a0c;
+  font-family: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+/* 桌面区域：黑底 + 一丝极淡的径向光晕，保留纵深 */
+.table-area {
+  background: radial-gradient(
+    ellipse at center,
+    rgba(255, 255, 255, 0.04) 0%,
+    rgba(255, 255, 255, 0.012) 55%,
+    transparent 100%
+  );
+}
+
+/* 牌背花纹 */
+.card-back {
+  background:
+    repeating-linear-gradient(
+      45deg,
+      rgba(255, 255, 255, 0.12) 0 3px,
+      transparent 3px 7px
+    ),
+    linear-gradient(135deg, #1d4ed8 0%, #1e40af 55%, #172554 100%);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  box-shadow:
+    inset 0 0 0 3px rgba(255, 255, 255, 0.08),
+    0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+/* 翻牌 */
+.card-reveal {
+  animation: card-reveal 0.6s ease-out;
+}
+
+@keyframes card-reveal {
+  from {
+    transform: rotateY(90deg);
+  }
+  to {
+    transform: rotateY(0deg);
+  }
+}
+
+/* 聊天气泡 */
+.chat-bubble {
+  max-width: 220px;
+  background: rgba(255, 255, 255, 0.96);
+  color: #1e293b;
+  padding: 6px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  animation: bubble-in 0.2s ease-out;
+  white-space: pre-wrap;
+  word-break: break-word;
+  text-align: left;
+}
+
+@keyframes bubble-in {
+  from {
+    transform: translateY(6px) scale(0.9);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+/* ===== 首页黑桃 A ===== */
+.landing-enter {
+  animation: fade-up 0.8s ease-out both;
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.landing-card {
+  position: relative;
+  width: 220px;
+  height: 315px;
+  border-radius: 20px;
+  background: linear-gradient(180deg, #ffffff 0%, #f1f1f2 100%);
+  box-shadow:
+    0 50px 100px rgba(0, 0, 0, 0.7),
+    0 20px 40px rgba(0, 0, 0, 0.5),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.06);
+  transform-style: preserve-3d;
+  transition: transform 0.12s ease-out;
+  cursor: pointer;
+}
+
+.landing-card .corner {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 0.9;
+  color: #0a0a0c;
+  font-weight: 800;
+  font-size: 30px;
+}
+
+.landing-card .corner span {
+  font-size: 22px;
+}
+
+.landing-card .corner-tl {
+  top: 14px;
+  left: 16px;
+}
+
+.landing-card .corner-br {
+  bottom: 14px;
+  right: 16px;
+  transform: rotate(180deg);
+}
+
+.landing-spade {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 128px;
+  line-height: 1;
+  color: #0a0a0c;
+  transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.landing-card:hover .landing-spade {
+  transform: scale(1.12);
+}
+
+.landing-glare {
+  position: absolute;
+  inset: 0;
+  border-radius: 20px;
+  background: radial-gradient(
+    circle at var(--gx, 50%) var(--gy, 50%),
+    rgba(255, 255, 255, 0.75) 0%,
+    transparent 45%
+  );
+  opacity: 0;
+  transition: opacity 0.25s;
+  pointer-events: none;
+}
+
+.landing-card:hover .landing-glare {
+  opacity: 1;
+}
