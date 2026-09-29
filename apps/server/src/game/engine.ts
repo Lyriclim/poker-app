@@ -5,6 +5,10 @@ import { computeSidePots } from './pots';
 
 export class GameError extends Error {}
 
+// Buy-ins are capped separately. A player can win more than one buy-in;
+// persisted chip fields use Prisma Int (signed 32-bit).
+const MAX_STORED_CHIPS = 2_147_483_647;
+
 export interface EnginePlayer {
   userId: string;
   username: string;
@@ -19,6 +23,8 @@ export interface EnginePlayer {
   roundBet: number; // 本轮已投入
   totalBet: number; // 本手已投入
   hasActed: boolean; // 本轮是否已行动
+  actedAtBet: number;
+  raiseThreshold: number;
   isReady: boolean; // 是否已准备开局
 }
 
@@ -37,14 +43,23 @@ export interface EngineOptions {
   deck?: Card[]; // 测试注入固定牌组
 }
 
+/** Server-only state. Never send this to a client: it includes the deck and every hole card. */
+export type GameCheckpoint = Pick<PokerGame,
+  'includeDisconnected' | 'smallBlind' | 'bigBlind' | 'maxPlayers' | 'players' | 'deck' |
+  'board' | 'street' | 'status' | 'handNumber' | 'dealerSeatIndex' |
+  'smallBlindSeatIndex' | 'bigBlindSeatIndex' | 'actionSeatIndex' | 'currentBet' |
+  'minRaise' | 'betCount' | 'burnCount' | 'showdownReveals' | 'soleWinnerSeatIndex'
+> & { lastWinners: WinnerInfo[] };
+
 /**
  * 纯游戏引擎：只管规则与状态，不做任何网络 / 数据库 / 定时器操作。
  * 所有方法同步返回事件数组，由外层（Table）负责广播与调度。
  */
 export class PokerGame {
-  readonly smallBlind: number;
-  readonly bigBlind: number;
-  readonly maxPlayers: number;
+  includeDisconnected = false;
+  smallBlind: number;
+  bigBlind: number;
+  maxPlayers: number;
 
   players: EnginePlayer[] = [];
   deck: Card[] = [];
@@ -78,11 +93,38 @@ export class PokerGame {
     this.fixedDeck = opts.deck;
   }
 
+  checkpoint(): GameCheckpoint {
+    return {
+      includeDisconnected: this.includeDisconnected, smallBlind: this.smallBlind, bigBlind: this.bigBlind,
+      maxPlayers: this.maxPlayers, players: this.players, deck: this.deck, board: this.board,
+      street: this.street, status: this.status, handNumber: this.handNumber,
+      dealerSeatIndex: this.dealerSeatIndex, smallBlindSeatIndex: this.smallBlindSeatIndex,
+      bigBlindSeatIndex: this.bigBlindSeatIndex, actionSeatIndex: this.actionSeatIndex,
+      currentBet: this.currentBet, minRaise: this.minRaise, betCount: this.betCount,
+      burnCount: this.burnCount, showdownReveals: this.showdownReveals,
+      soleWinnerSeatIndex: this.soleWinnerSeatIndex, lastWinners: this.lastWinners,
+    };
+  }
+
+  restore(saved: GameCheckpoint): void {
+    if (!Number.isSafeInteger(saved.handNumber) || saved.handNumber < 1 ||
+      !['playing', 'showdown', 'handover'].includes(saved.status) || !Array.isArray(saved.players) || !Array.isArray(saved.deck)) {
+      throw new GameError('Invalid saved hand');
+    }
+    Object.assign(this, saved);
+    this.lastWinners = saved.lastWinners;
+    // Connections belong to the old process. A restored live hand waits for players.
+    for (const player of this.players) { player.isConnected = false; player.isReady = false; }
+  }
+
   // ============ 玩家管理 ============
 
   addPlayer(userId: string, username: string, seatIndex: number, stack: number): void {
+    if (!Number.isInteger(seatIndex) || seatIndex < 0 || seatIndex >= this.maxPlayers) throw new GameError('Invalid seat');
+    if (!Number.isSafeInteger(stack) || stack < 0 || stack > MAX_STORED_CHIPS) throw new GameError('Invalid chip amount');
+    if (this.players.some((p) => p.userId === userId)) throw new GameError('You already have a seat');
     if (this.players.some((p) => p.seatIndex === seatIndex)) {
-      throw new GameError('座位已被占用');
+      throw new GameError('Seat is occupied');
     }
     this.players.push({
       userId,
@@ -98,6 +140,8 @@ export class PokerGame {
       roundBet: 0,
       totalBet: 0,
       hasActed: false,
+      actedAtBet: 0,
+      raiseThreshold: this.bigBlind,
       isReady: false,
     });
     this.players.sort((a, b) => a.seatIndex - b.seatIndex);
@@ -113,7 +157,7 @@ export class PokerGame {
 
   /** 本手参与玩家（有筹码且未暂离） */
   private participants(): EnginePlayer[] {
-    return this.players.filter((p) => p.stack > 0 && !p.isSittingOut);
+    return this.players.filter((p) => p.stack > 0 && !p.isSittingOut && (p.isConnected || this.includeDisconnected));
   }
 
   private inHand(): EnginePlayer[] {
@@ -158,7 +202,7 @@ export class PokerGame {
   // ============ 开局 ============
 
   startHand(): EngineEvent[] {
-    if (this.status === 'playing') return [];
+    if (this.status === 'playing' || this.status === 'showdown') return [];
     const participants = this.participants();
     if (participants.length < 2) return [];
 
@@ -182,6 +226,8 @@ export class PokerGame {
       p.roundBet = 0;
       p.totalBet = 0;
       p.hasActed = false;
+      p.actedAtBet = 0;
+      p.raiseThreshold = this.bigBlind;
       p.isInHand = participants.includes(p);
       p.isReady = false;
     }
@@ -212,17 +258,15 @@ export class PokerGame {
     const bb = this.getPlayer(this.bigBlindSeatIndex)!;
     this.commit(sb, this.smallBlind);
     this.commit(bb, this.bigBlind);
-    this.currentBet = Math.max(...participants.map((p) => p.roundBet));
+    this.currentBet = this.bigBlind;
+    if (this.eligible().length <= 1) this.currentBet = Math.max(...participants.map((p) => p.roundBet));
     this.betCount = 1; // 大盲视为第 1 个下注
 
     // 首位行动者：大盲左手第一个可行动者（UTG）
-    this.actionSeatIndex =
-      n === 2
-        ? this.dealerSeatIndex // 单挑 preflop 按钮先动
-        : this.nextEligible(this.bigBlindSeatIndex);
+    this.actionSeatIndex = this.nextEligible(this.bigBlindSeatIndex);
 
-    if (this.actionSeatIndex === null) {
-      return this.runOutAndShowdown();
+    if (this.noFurtherBetting()) {
+      return [{ type: 'handStarted', handNumber: this.handNumber }, ...this.runOutAndShowdown()];
     }
 
     return [{ type: 'handStarted', handNumber: this.handNumber }];
@@ -230,13 +274,34 @@ export class PokerGame {
 
   // ============ 行动 ============
 
-  applyAction(seatIndex: number, action: ActionType, amount = 0): EngineEvent[] {
-    if (this.status !== 'playing') throw new GameError('当前不在对局中');
-    if (this.actionSeatIndex !== seatIndex) throw new GameError('还没轮到你行动');
+  canRaise(seatIndex: number): boolean {
     const p = this.getPlayer(seatIndex);
-    if (!p || !p.isInHand || p.hasFolded || p.isAllIn) throw new GameError('当前无法行动');
+    return !!p && p.isInHand && !p.hasFolded && !p.isAllIn &&
+      this.eligible().length > 1 &&
+      (!p.hasActed || this.currentBet - p.actedAtBet >= p.raiseThreshold);
+  }
+
+  private noFurtherBetting(): boolean {
+    const players = this.eligible();
+    if (players.length === 0) return true;
+    if (players.length > 1) return false;
+    const otherBet = Math.max(0, ...this.active().filter((p) => p !== players[0]).map((p) => p.roundBet));
+    return players[0].roundBet >= otherBet;
+  }
+
+  applyAction(seatIndex: number, action: ActionType, amount = 0): EngineEvent[] {
+    if (!['fold', 'check', 'call', 'bet', 'raise', 'allin'].includes(action)) throw new GameError('Invalid action');
+    if (!Number.isSafeInteger(amount) || amount < 0 || amount > MAX_STORED_CHIPS) throw new GameError('Enter a whole chip amount');
+    if (this.status !== 'playing') throw new GameError('No hand is in progress');
+    if (this.actionSeatIndex !== seatIndex) throw new GameError('It is not your turn');
+    const p = this.getPlayer(seatIndex);
+    if (!p || !p.isInHand || p.hasFolded || p.isAllIn) throw new GameError('You cannot act now');
 
     const toCall = this.currentBet - p.roundBet;
+    const beforeBet = p.roundBet;
+    if ((action === 'raise' || action === 'bet' || (action === 'allin' && p.roundBet + p.stack > this.currentBet)) && !this.canRaise(seatIndex)) {
+      throw new GameError('Betting has not reopened. Call or fold.');
+    }
 
     switch (action) {
       case 'fold':
@@ -244,7 +309,7 @@ export class PokerGame {
         break;
 
       case 'check':
-        if (toCall !== 0) throw new GameError('有下注需要跟注，不能过牌');
+        if (toCall !== 0) throw new GameError('You must call or fold');
         p.hasActed = true;
         break;
 
@@ -258,8 +323,9 @@ export class PokerGame {
         break;
 
       case 'bet': {
-        if (this.currentBet !== 0) throw new GameError('已有下注，请使用加注');
-        if (amount < this.bigBlind) throw new GameError(`下注不能小于大盲 ${this.bigBlind}`);
+        if (amount > p.stack) throw new GameError('Not enough chips');
+        if (this.currentBet !== 0) throw new GameError('There is a bet already; use raise');
+        if (amount < this.bigBlind) throw new GameError(`Minimum bet is the big blind: ${this.bigBlind}`);
         this.commit(p, Math.min(amount, p.stack));
         this.currentBet = p.roundBet;
         this.minRaise = p.roundBet;
@@ -269,15 +335,15 @@ export class PokerGame {
       }
 
       case 'raise': {
-        if (this.currentBet === 0) throw new GameError('请直接下注');
+        if (this.currentBet === 0) throw new GameError('Use bet instead');
         const raiseTo = amount;
         const maxRaiseTo = p.roundBet + p.stack;
         const minFullRaiseTo = this.currentBet + this.minRaise;
-        if (raiseTo > maxRaiseTo) throw new GameError('筹码不足');
-        if (raiseTo <= this.currentBet) throw new GameError('加注额必须高于当前下注');
+        if (raiseTo > maxRaiseTo) throw new GameError('Not enough chips');
+        if (raiseTo <= this.currentBet) throw new GameError('Raise must exceed the current bet');
         // 未达到最小加注、且又不是全下 → 非法
         if (raiseTo < minFullRaiseTo && raiseTo < maxRaiseTo) {
-          throw new GameError(`最少需加注到 ${minFullRaiseTo}`);
+          throw new GameError(`Minimum raise to ${minFullRaiseTo}`);
         }
         const increment = raiseTo - this.currentBet;
         this.commit(p, raiseTo - p.roundBet);
@@ -291,7 +357,7 @@ export class PokerGame {
 
       case 'allin': {
         const allInAmount = p.stack;
-        if (allInAmount === 0) throw new GameError('没有筹码可下');
+        if (allInAmount === 0) throw new GameError('No chips available');
         this.commit(p, allInAmount);
         const newBet = p.roundBet;
         if (newBet > this.currentBet) {
@@ -305,7 +371,10 @@ export class PokerGame {
       }
     }
 
-    const events: EngineEvent[] = [{ type: 'action', seatIndex, action, amount, street: this.street! }];
+    p.hasActed = true;
+    p.actedAtBet = this.currentBet;
+    p.raiseThreshold = this.minRaise;
+    const events: EngineEvent[] = [{ type: 'action', seatIndex, action, amount: p.roundBet - beforeBet, street: this.street! }];
     events.push(...this.advance());
     return events;
   }
@@ -317,6 +386,7 @@ export class PokerGame {
     if (active.length === 1) {
       return this.endHandNoShowdown(active[0]);
     }
+    if (this.noFurtherBetting()) return this.runOutAndShowdown();
     if (this.isStreetEnded()) {
       return this.finishStreet();
     }
@@ -355,6 +425,8 @@ export class PokerGame {
     for (const p of this.players) {
       p.roundBet = 0;
       p.hasActed = false;
+      p.actedAtBet = 0;
+      p.raiseThreshold = this.bigBlind;
     }
 
     // 翻牌后首位行动者 = 按钮左手第一个可行动者（小盲，若未弃牌）
@@ -394,7 +466,7 @@ export class PokerGame {
     const payouts = new Map<number, number>();
     const winners: WinnerInfo[] = [];
 
-    for (const pot of pots) {
+    for (const [potIndex, pot] of pots.entries()) {
       const contenders = active.filter((p) => pot.eligibleSeatIndexes.includes(p.seatIndex));
       let bestVal = null as ReturnType<typeof evaluateBest> | null;
       let bestSeats: number[] = [];
@@ -420,6 +492,7 @@ export class PokerGame {
         p.stack += amt;
         payouts.set(seat, (payouts.get(seat) ?? 0) + amt);
         winners.push({
+          potIndex,
           seatIndex: seat,
           userId: p.userId,
           username: p.username,

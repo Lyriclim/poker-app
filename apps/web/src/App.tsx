@@ -5,6 +5,7 @@ import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import LobbyPage from './pages/LobbyPage';
 import TablePage from './pages/TablePage';
+import { useLayout } from './store/layout';
 
 function RequireAuth({ children }: { children: ReactNode }) {
   const token = useAuth((s) => s.token);
@@ -13,7 +14,9 @@ function RequireAuth({ children }: { children: ReactNode }) {
 }
 
 export default function App() {
+  const mode = useLayout((s) => s.mode);
   return (
+    <div className={`app-shell layout-${mode}`}>
     <Routes>
       <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<LoginPage />} />
@@ -35,5 +38,6 @@ export default function App() {
       />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    </div>
   );
 }

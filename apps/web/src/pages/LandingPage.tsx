@@ -2,9 +2,13 @@ import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { CSSProperties, MouseEvent } from 'react';
 import { useAuth } from '../store/auth';
+import { LayoutSwitch } from '../components/LayoutSwitch';
+import { LanguageSwitch } from '../components/LanguageSwitch';
+import { useT } from '../i18n';
 
 export default function LandingPage() {
   const navigate = useNavigate();
+  const t = useT();
   const token = useAuth((s) => s.token);
   const cardRef = useRef<HTMLDivElement>(null);
   const [tilt, setTilt] = useState<CSSProperties>({});
@@ -28,6 +32,7 @@ export default function LandingPage() {
 
   return (
     <div className="h-full flex items-center justify-center bg-[#0a0a0c] text-white overflow-hidden select-none relative">
+      <div className="absolute top-6 right-6 z-10 flex gap-2"><LanguageSwitch /><LayoutSwitch /></div>
       {/* 背景光晕 */}
       <div
         className="absolute inset-0 pointer-events-none"
@@ -54,14 +59,14 @@ export default function LandingPage() {
         </div>
 
         <div className="flex flex-col items-center gap-3 text-center">
-          <h1 className="text-3xl sm:text-4xl font-bold tracking-wide text-center">The ace in the pack</h1>
+          <h1 className="text-3xl sm:text-4xl font-bold tracking-wide text-center">{t('The ace in the pack')}</h1>
         </div>
 
         <button
           onClick={enter}
           className="px-12 py-3.5 rounded-full border border-white/25 text-white/80 hover:bg-white hover:text-black hover:border-white transition-all duration-300 text-sm font-semibold tracking-[0.2em] pl-[0.2em]"
         >
-          ENTER
+          {t('ENTER')}
         </button>
       </div>
     </div>
