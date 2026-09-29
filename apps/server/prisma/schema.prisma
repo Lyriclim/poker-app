@@ -20,15 +20,29 @@ model User {
 model Room {
   id         String   @id @default(uuid())
   name       String
-  inviteCode String   @unique
   smallBlind Int      @default(5)
   bigBlind   Int      @default(10)
   maxPlayers Int      @default(9)
   status     String   @default("WAITING")
   createdBy  String
   createdAt  DateTime @default(now())
+  settings   String   @default("{}")
+  session    String   @default("{}")
+  entries    SessionEntry[]
   seats      Seat[]
   hands      Hand[]
+}
+
+model SessionEntry {
+  id       String @id @default(uuid())
+  roomId   String
+  userId   String
+  username String
+  buyIn    Int @default(0)
+  cashOut  Int @default(0)
+  rank     Int?
+  room     Room @relation(fields: [roomId], references: [id])
+  @@unique([roomId, userId])
 }
 
 model Seat {
@@ -56,6 +70,7 @@ model Hand {
   createdAt  DateTime      @default(now())
   room       Room          @relation(fields: [roomId], references: [id])
   actions    HandAction[]
+  @@unique([roomId, handNumber])
 }
 
 model HandAction {

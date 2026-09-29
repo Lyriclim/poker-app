@@ -33,6 +33,7 @@ export interface PotSlice {
 }
 
 export interface WinnerInfo {
+  potIndex?: number;
   seatIndex: number;
   userId: string;
   username: string;
@@ -46,6 +47,43 @@ export interface HandResult {
   board: Card[];
   winners: WinnerInfo[];
   totalPot: number;
+  pots?: PotSlice[];
+}
+
+export interface BlindLevel { smallBlind: number; bigBlind: number }
+export interface RoomSettings {
+  mode: 'classic' | 'tournament';
+  startingStack: number;
+  levelMinutes: number;
+  levels: BlindLevel[];
+}
+export interface SessionPlayer {
+  userId: string; username: string; buyIn: number; cashOut: number; rank: number | null;
+}
+export interface SessionSummary extends SessionPlayer { stack: number; net: number }
+export interface FunPlayerStats {
+  hands: number;
+  wins: number;
+  showdowns: number;
+  biggestGain: number;
+  lowestNet: number;
+}
+export interface SessionAward {
+  id: 'collector' | 'showdown' | 'comeback' | 'scoop';
+  title: string;
+  description: string;
+  recipients: { userId: string; username: string; detail: string }[];
+}
+export interface SessionFun {
+  lastRecordedHand: number;
+  players: Record<string, FunPlayerStats>;
+  awards: SessionAward[];
+}
+export interface SessionState {
+  started: boolean; ended: boolean; paused: boolean; pauseRequested: boolean;
+  elapsedMs: number; runningSince: number | null; level: number;
+  lastHand: number | null;
+  fun: SessionFun;
 }
 
 /** 摊牌阶段展示的玩家（含公开手牌） */
@@ -60,9 +98,19 @@ export interface ShowdownPlayer {
 
 /** 服务器推给单个玩家的牌桌视图（已做信息隔离） */
 export interface TableView {
+  networkPaused: boolean;
+  actionVersion: string;
+  serverNow: number;
+  isHost: boolean;
+  canRaise: boolean;
+  saving: boolean;
+  saveError: boolean;
   roomId: string;
   roomName: string;
-  inviteCode: string;
+  settings: RoomSettings;
+  session: SessionState;
+  nextLevelAt: number | null;
+  sessionPlayers: SessionSummary[];
   maxPlayers: number;
   smallBlind: number;
   bigBlind: number;
@@ -95,7 +143,7 @@ export interface TableView {
     players: ShowdownPlayer[]; // 已展示手牌的玩家（全弃牌且未展示时为空）
     allFolded: boolean; // 是否只剩一人（其余全弃牌）
     soleWinnerSeatIndex: number | null; // 全弃牌时那个赢家的座位
-    ackedSeats: number[]; // 已点击「跳过」的座位（多人摊牌用）
+    deadline: number | null;
   } | null;
 }
 
@@ -103,11 +151,11 @@ export interface TableView {
 export interface RoomPublic {
   id: string;
   name: string;
-  inviteCode: string;
+  mode: 'classic' | 'tournament';
   smallBlind: number;
   bigBlind: number;
   maxPlayers: number;
-  status: string;
+  status: 'WAITING' | 'PLAYING' | 'PAUSED' | 'CLOSED';
   playerCount: number;
 }
 
@@ -123,11 +171,15 @@ export interface ClientToServerEvents {
   joinTable: (payload: { roomId: string }) => void;
   sit: (payload: { seatIndex: number; buyIn: number }) => void;
   stand: () => void;
+  rebuy: (payload: { amount: number }) => void;
+  sessionControl: (payload: { operation: 'start' | 'pause' | 'resume' | 'end' | 'lastHand' | 'cancelLastHand' }) => void;
+  removeOffline: (payload: { userId: string }) => void;
+  resizeTable: (payload: { maxPlayers: number }) => void;
+  retrySave: () => void;
   ready: (payload: { ready: boolean }) => void;
-  ackShowdown: () => void;
   showHand: (payload: { show: boolean }) => void;
   stillHere: () => void;
-  action: (payload: { type: ActionType; amount?: number }) => void;
+  action: (payload: { type: ActionType; amount?: number; roomId: string; actionVersion: string }) => void;
   chat: (payload: { text: string }) => void;
 }
 

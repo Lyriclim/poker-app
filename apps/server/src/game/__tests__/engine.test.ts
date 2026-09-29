@@ -21,6 +21,14 @@ function playOut(game: PokerGame) {
 }
 
 describe('游戏引擎', () => {
+  it('allows winnings and action amounts above the per-buy-in limit', () => {
+    const game = makeGame();
+    game.addPlayer('u1', 'A', 0, 150_000_000);
+    game.addPlayer('u2', 'B', 1, 150_000_000);
+    game.startHand();
+    expect(() => game.applyAction(game.actionSeatIndex!, 'raise', 120_000_000)).not.toThrow();
+  });
+
   it('不足两人无法开局', () => {
     const game = makeGame();
     game.addPlayer('u1', 'A', 0, 1000);

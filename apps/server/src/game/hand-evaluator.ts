@@ -136,28 +136,28 @@ export function bestFiveCards(cards: Card[]): Card[] {
   return bestCards;
 }
 
-/** 把牌型转成中文可读描述，例如「两对：A 与 K」 */
+/** Describe the evaluated hand in English. */
 export function describeHand(value: HandValue): string {
   const name = (r: number) => rankToLabel(r);
   const [a, b] = [value.ranks[0], value.ranks[1]];
   switch (value.category) {
     case 9:
-      return a === 14 ? '皇家同花顺' : `同花顺（${name(a)} 高）`;
+      return a === 14 ? 'Royal flush' : `Straight flush (${name(a)} high)`;
     case 8:
-      return `四条 ${name(a)}`;
+      return `Four of a kind (${name(a)})`;
     case 7:
-      return `葫芦 ${name(a)} 带 ${name(b)}`;
+      return `Full house (${name(a)} over ${name(b)})`;
     case 6:
-      return `同花（${name(a)} 高）`;
+      return `Flush (${name(a)} high)`;
     case 5:
-      return `顺子（${name(a)} 高）`;
+      return `Straight (${name(a)} high)`;
     case 4:
-      return `三条 ${name(a)}`;
+      return `Three of a kind (${name(a)})`;
     case 3:
-      return `两对 ${name(a)} 与 ${name(b)}`;
+      return `Two pair (${name(a)} and ${name(b)})`;
     case 2:
-      return `一对 ${name(a)}`;
+      return `Pair of ${name(a)}`;
     default:
-      return `高牌 ${name(a)}`;
+      return `High card ${name(a)}`;
   }
 }

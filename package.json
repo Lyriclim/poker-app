@@ -15,7 +15,7 @@
     "dev:server": "npm run dev -w @poker/server",
     "dev:web": "npm run dev -w @poker/web",
     "build": "npm run build -w @poker/web",
-    "test": "npm run test -w @poker/server",
+    "test": "npm run test -w @poker/server && npm exec -- vitest run apps/web/src",
     "typecheck": "npm run typecheck -w @poker/server && npm run typecheck -w @poker/web",
     "db:push": "npm run db:push -w @poker/server"
   },

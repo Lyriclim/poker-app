@@ -10,16 +10,19 @@ async function main(): Promise<void> {
 
   const app = buildApp(manager);
 
-  await app.listen({ port: config.port, host: '0.0.0.0' });
-
   const io = new Server(app.server, {
     cors: { origin: config.clientUrl },
   });
   manager.attachIo(io);
   setupGateway(io, manager);
 
-  // 从数据库恢复未关闭的牌桌
+  // 从数据库恢复未Close的牌桌
   await manager.load();
+  await manager.archiveStale();
+  const archiveTimer = setInterval(() => void manager.archiveStale(), 60 * 60 * 1000);
+  archiveTimer.unref();
+  app.addHook('onClose', () => clearInterval(archiveTimer));
+  await app.listen({ port: config.port, host: '0.0.0.0' });
 
   const address = app.server.address();
   const port = typeof address === 'object' && address ? address.port : config.port;

@@ -1,6 +1,7 @@
 import type { Card, PlayerPublic } from '@poker/shared';
 import { PlayingCard } from './PlayingCard';
 import { seatPosition } from '../lib/seatLayout';
+import { useT } from '../i18n';
 
 function Badge({ color, children, title }: { color: string; children: string; title?: string }) {
   return (
@@ -15,6 +16,8 @@ function Badge({ color, children, title }: { color: string; children: string; ti
 
 interface Props {
   player: PlayerPublic;
+  chipLabel: string;
+  betLabel: string;
   isYou: boolean;
   isDealer: boolean;
   isSmallBlind: boolean;
@@ -25,12 +28,13 @@ interface Props {
   isWinner?: boolean; // 摊牌阶段是否为赢家
   yourSeatIndex: number | null;
   maxPlayers: number;
+  handNumber: number;
   revealed: boolean; // 是否已翻出底牌（本人牌翻开时）
   showBacks: boolean; // 是否显示盖着的底牌
 }
 
 export function PlayerSeat({
-  player,
+  player, chipLabel, betLabel,
   isYou,
   isDealer,
   isSmallBlind,
@@ -41,9 +45,11 @@ export function PlayerSeat({
   isWinner,
   yourSeatIndex,
   maxPlayers,
+  handNumber,
   revealed,
   showBacks,
 }: Props) {
+  const t = useT();
   const pos = seatPosition(player.seatIndex, yourSeatIndex, maxPlayers);
   const initial = (player.username || '?').slice(0, 1).toUpperCase();
 
@@ -70,7 +76,7 @@ export function PlayerSeat({
         {handName && (
           <div className="text-[10px] font-bold text-amber-300 bg-black/60 rounded-full px-1.5 whitespace-nowrap shadow">
             {isWinner ? '🏆 ' : ''}
-            {handName}
+            {t(handName)}
           </div>
         )}
       </div>
@@ -95,27 +101,28 @@ export function PlayerSeat({
         </div>
 
         <div className="flex items-center justify-center gap-1 mt-0.5">
-          {isDealer && <Badge color="bg-yellow-500" title="庄家">D</Badge>}
-          {isSmallBlind && <Badge color="bg-blue-500" title="小盲">SB</Badge>}
-          {isBigBlind && <Badge color="bg-red-500" title="大盲">BB</Badge>}
-          {player.isSittingOut && <Badge color="bg-slate-500" title="暂离">暂离</Badge>}
+          {!player.isConnected ? <Badge color="bg-slate-600">{t('Offline')}</Badge> : player.isReady ? <Badge color="bg-emerald-700">{t(handNumber === 0 ? 'Ready' : 'Continuing')}</Badge> : null}
+          {isDealer && <Badge color="bg-yellow-500" title="Dealer">D</Badge>}
+          {isSmallBlind && <Badge color="bg-blue-500" title="Small blind">SB</Badge>}
+          {isBigBlind && <Badge color="bg-red-500" title="Big blind">BB</Badge>}
+          {player.isSittingOut && <Badge color="bg-slate-500" title={t('Sitting out')}>{t('Away')}</Badge>}
         </div>
 
         <div className="text-[11px] text-yellow-200 font-mono mt-0.5">
           <span className="inline-block w-2 h-2 rounded-full bg-gradient-to-br from-yellow-300 to-amber-600 mr-1 align-middle" />
-          {player.stack}
+          {chipLabel}
         </div>
 
         {player.roundBet > 0 && (
           <div className="absolute -bottom-2.5 left-1/2 -translate-x-1/2 text-[11px] font-bold text-yellow-300 bg-black/80 rounded-full px-2 leading-4 whitespace-nowrap shadow">
-            {player.roundBet}
+            {betLabel}
           </div>
         )}
       </div>
 
       {player.isAllIn && (
         <span className="text-[10px] font-bold text-red-300 bg-red-950/60 rounded-full px-1.5 leading-4">
-          ALL-IN
+          {t('All-in').toUpperCase()}
         </span>
       )}
     </div>

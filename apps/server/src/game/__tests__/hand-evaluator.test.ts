@@ -47,6 +47,6 @@ describe('手牌评估', () => {
   });
 
   it('描述文字', () => {
-    expect(describeHand(evaluateFive(cards('As', 'Ah', 'Ad', 'Kh', 'Kc')))).toBe('葫芦 A 带 K');
+    expect(describeHand(evaluateFive(cards('As', 'Ah', 'Ad', 'Kh', 'Kc')))).toBe('Full house (A over K)');
   });
 });

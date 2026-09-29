@@ -54,6 +54,9 @@ export function useDealAnimation(view: TableView | null): DealState {
       setHolesRevealed(false);
       schedule(() => setHolesDealt(true), HOLE_APPEAR_MS);
       schedule(() => setHolesRevealed(true), HOLE_APPEAR_MS + HOLE_FLIP_PAUSE_MS);
+      for (let i = 0; i < view.board.length; i++) {
+        schedule(() => setBoardRevealed(i + 1), HOLE_APPEAR_MS + HOLE_FLIP_PAUSE_MS + BOARD_FLIP_PAUSE_MS + i * BOARD_FLIP_GAP_MS);
+      }
       return;
     }
 
@@ -72,5 +75,8 @@ export function useDealAnimation(view: TableView | null): DealState {
     }
   }, [view]);
 
-  return { boardRevealed, holesDealt, holesRevealed };
+  // An acting player must see every card before the betting controls become usable.
+  // Other players can still enjoy the reveal animation while they wait.
+  const acting = view?.status === 'playing' && view.actionSeatIndex !== null && view.actionSeatIndex === view.yourSeatIndex;
+  return { boardRevealed: acting ? view.board.length : boardRevealed, holesDealt: acting || holesDealt, holesRevealed: acting || holesRevealed };
 }
