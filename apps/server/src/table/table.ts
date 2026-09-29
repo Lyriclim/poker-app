@@ -16,7 +16,7 @@ import type {
   WinnerInfo,
   RoomSettings, SessionState, SessionPlayer,
 } from '@poker/shared';
-import { AFK_CHECK_AFTER_MS, AFK_CHECK_RESPONSE_MS } from '@poker/shared';
+import { AFK_CHECK_AFTER_MS, AFK_CHECK_RESPONSE_MS, raiseLabel } from '@poker/shared';
 import { PokerGame, GameError, type EngineEvent } from '../game/engine';
 import { prisma } from '../db';
 import { freshSession, elapsed, checkpoint } from './session';
@@ -730,7 +730,7 @@ export class Table {
       case 'bet':
         return `${username} bets ${amount}`;
       case 'raise':
-        return `${username} raises (+${amount} chips)`;
+        return `${username} ${raiseLabel(this.game.betCount)}s to ${this.game.currentBet}`;
       case 'allin':
         return `${username} all-in`;
     }

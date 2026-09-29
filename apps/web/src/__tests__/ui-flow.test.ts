@@ -29,7 +29,8 @@ describe('Player-facing recovery flows', () => {
     expect(localize('zh', 'Take a breath.')).toBe('别上头！');
     expect(localize('zh', "You're going all-in with {chips} chips. Ready?", { chips: '1,000' })).toContain('押上剩余的 1,000 筹码');
     expect(localize('zh', 'Full house (A over K)')).toBe('A 葫芦 K');
-    expect(localize('zh', 'Alex raises (+15 chips)')).toBe('Alex加注 15');
+    expect(localize('zh', 'Alex raises to 15')).toBe('Alex 加注至 15');
+    expect(localize('zh', 'Alex 3-bets to 50')).toBe('Alex 3-bet 加注至 50');
     expect(localize('en', 'Take a breath.')).toBe('Take a breath.');
   });
   it('replaces betting controls with host recovery controls during a network hold', () => {

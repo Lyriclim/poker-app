@@ -1,4 +1,4 @@
-import { spendsEntireStack } from '@poker/shared';
+import { spendsEntireStack, raiseLabel } from '@poker/shared';
 import { useTableCommand } from '../lib/useTableCommand';
 import { useEffect, useState } from 'react';
 import type { ActionType, TableView } from '@poker/shared';
@@ -47,12 +47,14 @@ export function ActionBar({ view, onRebuy }: { view: TableView; onRebuy: () => v
   }
   if (myTurn) {
     const total = Number(amount);
+    const level = raiseLabel(view.betCount + 1);
+    const raiseVerb = isBet ? 'Bet' : level === 'raise' ? 'Raise to' : `${level} to`;
     const quickTo = (frac: number) => clamp(Math.floor(me.roundBet + toCall + frac * (view.totalPot + toCall)), min, max);
     return <fieldset disabled={pending} className="bet-controls" aria-busy={pending}><div className="quick-bets">
       {QUICK_BETS.map(({ label, frac }) => <button key={label} disabled={!canRaise} onClick={() => emit(isBet ? 'bet' : 'raise', quickTo(frac))} title={`Total ${quickTo(frac)}`}>{label}</button>)}
       <button disabled={!canFifteen} title={`${t('Total')} ${fifteenTo}`} onClick={() => fifteenTo < min && fifteenTo === max ? emit('allin') : emit(isBet ? 'bet' : 'raise', fifteenTo)}>+15</button><button className="allin-shortcut" disabled={!canAllIn} onClick={() => emit('allin')}>{t('All-in')}</button>
-    </div>{canRaise && <div className="bet-sizing"><input type="range" aria-label={t('Bet amount slider')} min={min} max={max} step={1} value={clamp(Number(amount), min, max)} onChange={(e) => setAmount(e.target.value)} /><label><span>{t(isBet ? 'Bet' : 'Raise to')}</span><input type="number" inputMode="numeric" aria-label={t('Bet amount')} min={min} max={max} step={1} value={amount} onChange={(e) => setAmount(e.target.value)} onBlur={() => setAmount(String(clamp(Math.round(Number(amount)), min, max)))} /></label></div>}
-      <div className="primary-actions"><button className="fold-button" onClick={() => emit('fold')}>{t('Fold')}</button><button className="call-button" onClick={() => emit(toCall === 0 ? 'check' : 'call')}>{toCall === 0 ? t('Check') : `${t('Call')} ${fmt(Math.min(toCall, me.stack))}`}</button>{canRaise ? <button className="raise-button" disabled={amount === '' || !Number.isSafeInteger(total) || total < min || total > max} onClick={() => emit(isBet ? 'bet' : 'raise', total)}>{t(isBet ? 'Bet' : 'Raise to')} {fmt(total || min)}</button> : canAllIn ? <button className="raise-button" onClick={() => emit('allin')}>{t('All-in')} {fmt(me.stack)}</button> : null}</div>
+    </div>{canRaise && <div className="bet-sizing"><input type="range" aria-label={t('Bet amount slider')} min={min} max={max} step={1} value={clamp(Number(amount), min, max)} onChange={(e) => setAmount(e.target.value)} /><label><span>{t(raiseVerb)}</span><input type="number" inputMode="numeric" aria-label={t('Bet amount')} min={min} max={max} step={1} value={amount} onChange={(e) => setAmount(e.target.value)} onBlur={() => setAmount(String(clamp(Math.round(Number(amount)), min, max)))} /></label></div>}
+      <div className="primary-actions"><button className="fold-button" onClick={() => emit('fold')}>{t('Fold')}</button><button className="call-button" onClick={() => emit(toCall === 0 ? 'check' : 'call')}>{toCall === 0 ? t('Check') : `${t('Call')} ${fmt(Math.min(toCall, me.stack))}`}</button>{canRaise ? <button className="raise-button" disabled={amount === '' || !Number.isSafeInteger(total) || total < min || total > max} onClick={() => emit(isBet ? 'bet' : 'raise', total)}>{t(raiseVerb)} {fmt(total || min)}</button> : canAllIn ? <button className="raise-button" onClick={() => emit('allin')}>{t('All-in')} {fmt(me.stack)}</button> : null}</div>
       {confirm && <ConfirmDialog title={t('Take a breath.')} text={t("You're going all-in with {chips} chips. Ready?", { chips: me.stack.toLocaleString() })} confirmLabel={t('Go all-in')} onCancel={() => setConfirm(null)} onConfirm={() => { if (myTurn && canAllIn) void submit(confirm.type, confirm.amount); setConfirm(null); }} />}</fieldset>;
   }
   if (view.status === 'waiting' || view.status === 'handover') {

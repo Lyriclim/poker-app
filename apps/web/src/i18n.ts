@@ -49,10 +49,16 @@ function translateDynamic(key: string): string | undefined {
   }
   const pair = key.match(/^Pair of (.+)$/); if (pair) return `一对 ${pair[1]}`;
   const high = key.match(/^High card (.+)$/); if (high) return `高牌 ${high[1]}`;
-  const action = key.match(/^(.*) (folds|checks|calls|bets \d+|raises \(\+\d+ chips\)|all-in)$/);
+  const action = key.match(/^(.*) (folds|checks|calls|all-in|bets \d+|raises to \d+|\d+-bets to \d+)$/);
   if (action) {
-    const word = action[2];
-    return `${action[1]}${word === 'folds' ? '弃牌' : word === 'checks' ? '过牌' : word === 'calls' ? '跟注' : word === 'all-in' ? '全下' : word.startsWith('bets ') ? `下注 ${word.slice(5)}` : `加注 ${word.match(/\d+/)?.[0] ?? ''}`}`;
+    const [, who, word] = action;
+    if (word === 'folds') return `${who} 弃牌`;
+    if (word === 'checks') return `${who} 过牌`;
+    if (word === 'calls') return `${who} 跟注`;
+    if (word === 'all-in') return `${who} 全下`;
+    if (word.startsWith('bets ')) return `${who} 下注 ${word.slice(5)}`;
+    const raise = word.match(/^(raises|(\d+)-bets) to (\d+)$/);
+    if (raise) return `${who}${raise[2] ? ` ${raise[2]}-bet` : ''} 加注至 ${raise[3]}`;
   }
   const wins = key.match(/^(\d+) winning hands$/); if (wins) return `赢了 ${wins[1]} 手`;
   const showdowns = key.match(/^(\d+) showdowns$/); if (showdowns) return `摊牌 ${showdowns[1]} 次`;
