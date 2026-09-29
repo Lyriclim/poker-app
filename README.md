@@ -90,7 +90,7 @@ npm run dev
 ## 📁 项目结构
 
 ```
-poker-app/
+the-ace-in-the-pack/
 ├── packages/shared/            # 前后端共享：类型、常量、事件协议
 ├── apps/server/
 │   ├── src/game/               # ★ 纯游戏引擎（无网络/DB/定时器，可单测）
